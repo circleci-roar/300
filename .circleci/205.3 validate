@@ -1,0 +1,28 @@
+DEPLOY_ENVIRONMENT=dev
+APIGWNAME=${DEPLOY_ENVIRONMENT}-serverless-http-api-dynamodb
+APIGWURL=$(aws apigatewayv2 get-apis | jq --arg gwname ${APIGWNAME} '.Items[] | select(.Name == $gwname) | .ApiEndpoint' | jq -r .) && echo "Our APIGW URL is : ${APIGWURL}"
+RAND=$(openssl rand -hex 8) && echo "Our Random Tracking Code is : ${RAND}"
+
+# create data blob
+DATA=$(echo "{\"text\":\"${RAND}\"}" | jq .)
+# push data
+curl -s -X POST ${APIGWURL}/todos --header "Content-Type: application/json" --data "${DATA}" | jq .
+
+# get all Todos Back
+TODOS=$(curl -s $APIGWURL/todos)
+# find our marker
+TODOID=$(echo $TODOS | jq --arg rand $RAND '.[] | select(.text == $rand) | .id ' | jq -r .) && echo "Our TODOID is : ${TODOID}"
+
+
+# check the exact item
+curl -s ${APIGWURL}/todos/${TODOID} | jq .
+
+# update the exact item
+DATA=$(echo $DATA | jq '. |= .+ {"checked": true}') && echo $DATA | jq .
+curl -s -X PUT ${APIGWURL}/todos/${TODOID} --header "Content-Type: application/json" --data "${DATA}" | jq .
+
+# check the exact item
+curl -s ${APIGWURL}/todos/${TODOID} | jq .
+
+# delete the exact item
+curl -s -X DELETE ${APIGWURL}/todos/${TODOID} | jq .
