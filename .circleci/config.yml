@@ -4,6 +4,14 @@ orbs:
   aws-cli: circleci/aws-cli@2.0.6
 
   sls:
+    executors:
+      default:
+        parameters:
+          tag:
+            type: string
+            default: "12.22"
+        docker:
+          - image: cimg/node:<< parameters.tag >>
     commands:
       deploy:
         parameters:
@@ -25,7 +33,33 @@ orbs:
               environment:
                 DEPLOY_ENVIRONMENT: << parameters.environment >>
               command: yarn run sls package --stage $DEPLOY_ENVIRONMENT
-
+    jobs:
+      main:
+        executor: default
+        resource_class: small
+        parameters:
+          environment:
+            type: string
+          action:
+            type: enum
+            enum: [deploy,package]
+          pre-deployment-steps:
+            type: steps
+            default: []
+        steps:
+          - steps: << parameters.pre-deployment-steps >>
+          - when:
+              condition:
+                equal: [deploy, << parameters.action >>]
+              steps:
+                - deploy:
+                    environment: << parameters.environment >>      
+          - when:
+              condition:
+                equal: [package, << parameters.action >>]
+              steps:
+                - package:
+                    environment: << parameters.environment >>
 executors:
   default:
     docker: 
@@ -248,6 +282,20 @@ workflows:
             branches:
               only:
                 - /^feature\/.*/
+      - sls/main:
+          name: Package Serverless
+          context: AWS_DEV_CREDENTIALS
+          environment: dev
+          action: package
+          pre-deployment-steps:
+            - custom-checkout:
+                merge: true
+            - aws-cli/install
+            - setup-yarn-cache
+          filters:
+            branches:
+              only:
+                - /^feature\/.*/      
       - main:
           name: Deploy Dev
           context: AWS_DEV_CREDENTIALS
