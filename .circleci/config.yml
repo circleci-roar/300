@@ -2,6 +2,7 @@ version: 2.1
 
 orbs:
   aws-cli: circleci/aws-cli@2.0.6
+  slack: circleci/slack@4.8.1
 
   sls:
     executors:
@@ -195,7 +196,15 @@ jobs:
       - aws-cli/install
       - make-bucket:
           bucket-name: $DEPLOYMENT_BUCKET
-  
+      - slack/notify:
+          channel: C0331BVUMPV
+          event: pass
+          template: basic_success_1
+      - slack/notify:
+          channel: C0331BVUMPV
+          event: fail
+          template: basic_fail_1
+
   validate:
     executor: aws-cli/default
     resource_class: small
