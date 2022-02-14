@@ -195,7 +195,7 @@ jobs:
     steps:
       - aws-cli/install
       - make-bucket:
-          bucket-name: "1245.acb%"  # $DEPLOYMENT_BUCKET
+          bucket-name: $DEPLOYMENT_BUCKET
       - slack/notify:
           channel: C0331BVUMPV
           event: pass
