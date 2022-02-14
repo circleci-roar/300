@@ -47,6 +47,9 @@ orbs:
           pre-deployment-steps:
             type: steps
             default: []
+          post-deployment-steps:
+            type: steps
+            default: []
         steps:
           - steps: << parameters.pre-deployment-steps >>
           - when:
@@ -61,7 +64,7 @@ orbs:
               steps:
                 - package:
                     environment: << parameters.environment >>
-
+          - steps: << parameters.post-deployment-steps >>
   runway:
     executors:
       default:
@@ -107,6 +110,9 @@ orbs:
           pre-deployment-steps:
             type: steps
             default: []
+          post-deployment-steps:
+            type: steps
+            default: []
         steps:
           - steps: << parameters.pre-deployment-steps >>
           - when:
@@ -121,7 +127,7 @@ orbs:
               steps:
                 - plan:
                     environment: << parameters.environment >>
-
+          - steps: << parameters.post-deployment-steps >>
 commands:
   setup-yarn-cache:
     steps:
@@ -196,11 +202,7 @@ jobs:
       - aws-cli/install
       - make-bucket:
           bucket-name: $DEPLOYMENT_BUCKET
-      - slack/notify:
-          channel: C0331BVUMPV
-          event: pass
-          template: basic_success_1
-      - slack/notify:
+      - slack/notify: &slack-fail
           channel: C0331BVUMPV
           event: fail
           template: basic_fail_1
@@ -224,6 +226,11 @@ jobs:
             DEPLOY_ENVIRONMENT: << parameters.environment >>
           working_directory: .circleci
           command: chmod +x validate.sh && ./validate.sh
+      - slack/notify:
+          channel: C0331BVUMPV
+          event: pass
+          template: basic_success_1
+      - slack/notify: *slack-fail
 
 workflows:
   branch-workflow:
@@ -244,6 +251,8 @@ workflows:
                 merge: true
             - aws-cli/install
             - setup-pip-cache
+          post-deployment-steps:
+            - slack/notify: *slack-fail
           filters: &filters
             branches:
               only:
@@ -260,6 +269,8 @@ workflows:
                 merge: true
             - aws-cli/install
             - setup-yarn-cache
+          post-deployment-steps:
+            - slack/notify: *slack-fail
           filters: *filters
           requires:
             - setup
@@ -278,7 +289,7 @@ workflows:
           filters: *deployFilters
       - validate:
           name: Validate Dev
-          context: AWS_DEV_CREDENTIALS
+          context: *context
           environment: *env
           requires: 
             - Deploy Runway
