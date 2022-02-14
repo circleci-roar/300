@@ -319,3 +319,9 @@ workflows:
           action: *action
           environment: *env
           filters: *filters
+          post-deployment-steps:
+            - slack/notify:
+                channel: C0331BVUMPV
+                event: pass
+                template: success_tagged_deploy_1
+            - slack/notify: *slack-fail
