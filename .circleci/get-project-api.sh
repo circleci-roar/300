@@ -7,6 +7,7 @@ function init {
 
     if [ !$CI ]
     then
+        echo "why am I here"
         # this file, when not in CI environment, needs to contain the following:
             # export CIRCLE_USER_TOKEN="your user token"
             # export CIRCLE_PROJECT_USERNAME="your project user name"
