@@ -5,7 +5,7 @@ function init {
         mkdir ${tmp_dir}
     fi
 
-    if [ !$CI ]
+    if [ !$CI == "true" ]
     then
         echo "why am I here"
         # this file, when not in CI environment, needs to contain the following:
