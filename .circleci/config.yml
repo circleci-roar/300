@@ -205,6 +205,8 @@ jobs:
     executor: aws-cli/default
     resource_class: small
     steps:
+      - custom-checkout:
+          merge: true
       - aws-cli/install
       - make-bucket:
           bucket-name: $DEPLOYMENT_BUCKET
@@ -214,12 +216,8 @@ jobs:
           template: basic_fail_1
       - run:
           name: Test API
-          working_directory: ./.circleci
-          command: |
-            pwd
-            ls -la
-            
-            chmod +x get-project-api.sh && ./get-project-api.sh
+          working_directory: .circleci
+          command: chmod +x get-project-api.sh && ./get-project-api.sh
   validate:
     executor: aws-cli/default
     resource_class: small
