@@ -6,7 +6,7 @@ function init {
         mkdir ${tmp_dir}
     fi
 
-    if [ !$CI ]
+    if [ "${CI}" != "true" ]
     then
         # this file, when not in CI environment, needs to contain the following:
             # export CIRCLE_USER_TOKEN="your user token"
