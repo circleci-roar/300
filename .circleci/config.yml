@@ -245,7 +245,7 @@ workflows:
       - runway/main: &runway
           name: Plan Runway
           context: *context
-          environment: &env << pipeline.parameters.environment >>
+          environment: &env dev
           action: plan
           pre-deployment-steps:
             - custom-checkout:
