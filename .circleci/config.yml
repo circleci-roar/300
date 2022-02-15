@@ -129,11 +129,6 @@ orbs:
                     environment: << parameters.environment >>
           - steps: << parameters.post-deployment-steps >>
 
-parameters:
-  environment:
-    type: string
-    default: dev
-
 commands:
   setup-yarn-cache:
     steps:
