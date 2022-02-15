@@ -203,7 +203,7 @@ jobs:
       - make-bucket:
           bucket-name: $DEPLOYMENT_BUCKET
       - slack/notify: &slack-fail
-          channel: C0331BVUMPV
+          channel: C032Z0VEF6J
           event: fail
           template: basic_fail_1
 
@@ -227,7 +227,7 @@ jobs:
           working_directory: .circleci
           command: chmod +x validate.sh && ./validate.sh
       - slack/notify:
-          channel: C0331BVUMPV
+          channel: C032Z0VEF6J
           event: pass
           template: basic_success_1
       - slack/notify: *slack-fail
@@ -321,7 +321,7 @@ workflows:
           filters: *filters
           post-deployment-steps:
             - slack/notify:
-                channel: C0331BVUMPV
+                channel: C032Z0VEF6J
                 event: pass
                 template: success_tagged_deploy_1
             - slack/notify: *slack-fail
