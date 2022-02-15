@@ -214,7 +214,7 @@ jobs:
           template: basic_fail_1
       - run:
           name: Test API
-          working_directory: .circleci
+          working_directory: ./.circleci
           command: chmod +x get-project-api.sh && ./get-project-api.sh
   validate:
     executor: aws-cli/default
