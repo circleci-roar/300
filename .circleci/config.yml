@@ -215,7 +215,11 @@ jobs:
       - run:
           name: Test API
           working_directory: ./.circleci
-          command: chmod +x get-project-api.sh && ./get-project-api.sh
+          command: |
+            pwd
+            ls -la
+            
+            chmod +x get-project-api.sh && ./get-project-api.sh
   validate:
     executor: aws-cli/default
     resource_class: small
