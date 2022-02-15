@@ -129,6 +129,11 @@ orbs:
                     environment: << parameters.environment >>
           - steps: << parameters.post-deployment-steps >>
 
+parameters:
+  environment:
+    type: string
+    default: dev
+
 commands:
   setup-yarn-cache:
     steps:
@@ -245,7 +250,7 @@ workflows:
       - runway/main: &runway
           name: Plan Runway
           context: *context
-          environment: &env dev
+          environment: &env << pipeline.parameters.environment >>
           action: plan
           pre-deployment-steps:
             - custom-checkout:
