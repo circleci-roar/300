@@ -3,7 +3,6 @@ version: 2.1
 orbs:
   aws-cli: circleci/aws-cli@2.0.6
   slack: circleci/slack@4.8.1
-
   sls:
     executors:
       default:
@@ -30,7 +29,7 @@ orbs:
             type: string
         steps:
           - run:
-              name: Serverless Deploy << parameters.environment >>
+              name: Serverless Package (Plan) << parameters.environment >>
               environment:
                 DEPLOY_ENVIRONMENT: << parameters.environment >>
               command: yarn run sls package --stage $DEPLOY_ENVIRONMENT
@@ -43,7 +42,7 @@ orbs:
             type: string
           action:
             type: enum
-            enum: [deploy,package]
+            enum: [deploy,plan]
           pre-deployment-steps:
             type: steps
             default: []
@@ -60,7 +59,7 @@ orbs:
                     environment: << parameters.environment >>      
           - when:
               condition:
-                equal: [package, << parameters.action >>]
+                equal: [plan, << parameters.action >>]
               steps:
                 - package:
                     environment: << parameters.environment >>
@@ -83,7 +82,7 @@ orbs:
             type: string
         steps:
           - run:
-              name: Deploy << parameters.environment >>
+              name: Runway Deploy << parameters.environment >>
               environment:
                 DEPLOY_ENVIRONMENT: << parameters.environment >>
               command: pipenv run runway deploy
@@ -93,7 +92,7 @@ orbs:
             type: string
         steps:
           - run:
-              name: Deploy << parameters.environment >>
+              name: Runway Plan << parameters.environment >>
               environment:
                 DEPLOY_ENVIRONMENT: << parameters.environment >>
               command: pipenv run runway plan
@@ -132,7 +131,19 @@ orbs:
 parameters:
   environment:
     type: string
-    default: dev
+    default: "dev"
+  aws-credentials-context:
+    type: string
+    default: "AWS_DEV_CREDENTIALS"
+  workflow-name:
+    type: string
+    default: "router"
+  action:
+    type: string
+    default: "plan"
+  merge:
+    type: string
+    default: "true"
 
 commands:
   setup-yarn-cache:
@@ -242,21 +253,101 @@ jobs:
           event: pass
           template: basic_success_1
       - slack/notify: *slack-fail
+  trigger-workflow:
+    executor: aws-cli/default
+    resource_class: small
+    parameters:
+      environment:
+        type: string
+      aws-credentials-context:
+        type: string
+      workflow-name:
+        type: string
+      action:
+        type: string        
+    steps:
+      - custom-checkout:
+          merge: true
+      - run:
+          name: Trigger workflow
+          working_directory: .circleci
+          environment:
+            PIPELINE_PARM_ENVIRONMENT: << parameters.environment >>
+            PIPELINE_PARM_CONTEXT: << parameters.aws-credentials-context >>
+            PIPELINE_PARM_WORKFLOW_NAME: << parameters.workflow-name >>
+            PIPELINE_PARM_ACTION: << parameters.action >>
+          command: chmod +x trigger-pipeline-api.sh && ./trigger-pipeline-api.sh
 
 workflows:
-  branch-workflow:
+  router:
     when:
-      not: << pipeline.git.tag >>
+      and:
+        - equal:
+            - "router"
+            - << pipeline.parameters.workflow-name >>
+        - or:
+            - << pipeline.git.tag >>
+            - << pipeline.git.branch >>
+    jobs:
+      - trigger-workflow:
+          name: Trigger Planning Workflow
+          environment: "dev"
+          aws-credentials-context: "AWS_DEV_CREDENTIALS"
+          workflow-name: "main"
+          action: "plan"
+          filters:
+            branches:
+              ignore:
+                - main
+      - trigger-workflow:
+          name: Trigger Dev Deployment
+          environment: "dev"
+          aws-credentials-context: "AWS_DEV_CREDENTIALS"
+          workflow-name: "main"
+          action: "deploy"
+          filters:
+            branches:
+              only:
+                - main
+      - trigger-workflow:
+          name: Trigger Prod Deployment
+          environment: "prod"
+          aws-credentials-context: "AWS_PROD_CREDENTIALS"
+          workflow-name: "main"
+          action: deploy
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /([1-9][0-9]+|[0-9])\.([1-9][0-9]+|[0-9])\.([1-9][0-9]+|[0-9])/
+
+  main:
+    when:
+      and:
+        - equal:
+            - "main"
+            - << pipeline.parameters.workflow-name >>
+        - or:
+            - << pipeline.git.tag >>
+            - << pipeline.git.branch >>
     jobs:
       - setup:
-          context: &context 
-            - AWS_DEV_CREDENTIALS
+          name: Setup << pipeline.parameters.environment >>
+          context: &context
+            - << pipeline.parameters.aws-credentials-context >>
             - SLACK
-      - runway/main: &runway
-          name: Plan Runway
+          filters: &filters
+            branches:
+              only:
+                - /.*/
+            tags:
+              only:
+                - /.*/
+      - runway/main:
+          name: << pipeline.parameters.action >> Runway - << pipeline.parameters.environment >>
           context: *context
           environment: &env << pipeline.parameters.environment >>
-          action: plan
+          action: &action << pipeline.parameters.action >>
           pre-deployment-steps:
             - custom-checkout:
                 merge: true
@@ -264,17 +355,14 @@ workflows:
             - setup-pip-cache
           post-deployment-steps:
             - slack/notify: *slack-fail
-          filters: &filters
-            branches:
-              only:
-                - /^feature\/.*/
+          filters: *filters
           requires:
-            - setup
-      - sls/main: &sls
-          name: Package Serverless
+            - Setup << pipeline.parameters.environment >>
+      - sls/main:
+          name: << pipeline.parameters.action >> Serverless - << pipeline.parameters.environment >>
           context: *context
           environment: *env
-          action: package
+          action: *action
           pre-deployment-steps:
             - custom-checkout:
                 merge: true
@@ -284,55 +372,15 @@ workflows:
             - slack/notify: *slack-fail
           filters: *filters
           requires:
-            - setup
-      - runway/main: 
-          <<: *runway
-          name: Deploy Runway
-          action: deploy
-          filters: &deployFilters
+            - Setup << pipeline.parameters.environment >>
+      - validate:
+          name: Validate << pipeline.parameters.environment >>
+          context: *context
+          environment: *env
+          filters:
             branches:
               only:
-                - main
-      - sls/main:
-          <<: *sls
-          name: Deploy Serverless
-          action: deploy
-          filters: *deployFilters
-      - validate:
-          name: Validate Dev
-          context: *context
-          environment: *env
+                - "main"
           requires: 
-            - Deploy Runway
-            - Deploy Serverless
-  
-  tag-workflow:
-    when: << pipeline.git.tag >>
-    jobs:
-      - setup:
-          context: &context 
-            - AWS_PROD_CREDENTIALS
-            - SLACK
-          filters: &filters
-            tags:
-              only: /([1-9][0-9]+|[0-9])\.([1-9][0-9]+|[0-9])\.([1-9][0-9]+|[0-9])/
-      - runway/main:
-          <<: *runway
-          name: Deploy Runway for version << pipeline.git.tag >>
-          action: &action deploy
-          context: *context
-          environment: &env prod
-          filters: *filters
-      - sls/main:
-          <<: *sls
-          name: Deploy Serverless for version << pipeline.git.tag >>
-          context: *context
-          action: *action
-          environment: *env
-          filters: *filters
-          post-deployment-steps:
-            - slack/notify:
-                channel: C032Z0VEF6J
-                event: pass
-                template: success_tagged_deploy_1
-            - slack/notify: *slack-fail
+            - << pipeline.parameters.action >> Runway - << pipeline.parameters.environment >>
+            - << pipeline.parameters.action >> Serverless - << pipeline.parameters.environment >>
