@@ -23,11 +23,49 @@ function init {
 
 init
 
+### environment
 k=environment
-v=dev
+v=${PIPELINE_PARM_ENVIRONMENT}
 parms=$(jq -n --arg k "$k" --arg v "$v" 'setpath(["parameters",$k]; $v)')
 
-data=$(echo "$parms" | jq --arg branch "$CIRCLE_BRANCH" '. |= .+ {"branch":$branch}')
+### aws-credentials-context
+k=aws-credentials-context
+v=${PIPELINE_PARM_CONTEXT}
+parms=$(echo "$parms" | jq --arg k "$k" --arg v "$v" 'setpath(["parameters",$k]; $v)')
+
+### workflow-name
+k=workflow-name
+v=${PIPELINE_PARM_WORKFLOW_NAME}
+parms=$(echo "$parms" | jq --arg k "$k" --arg v "$v" 'setpath(["parameters",$k]; $v)')
+
+### action
+k=action
+v=${PIPELINE_PARM_ACTION}
+parms=$(echo "$parms" | jq --arg k "$k" --arg v "$v" 'setpath(["parameters",$k]; $v)')
+
+### merge
+k=merge
+v=${PIPELINE_PARM_MERGE}
+parms=$(echo "$parms" | jq --arg k "$k" --arg v "$v" 'setpath(["parameters",$k]; $v)')
+
+### determine branch or tag
+
+if [ "z${CIRCLE_BRANCH}" == "z" ]
+then
+    if [ "z${CIRCLE_TAG}" == "z" ]
+    then
+        echo "Could not find branch nor tag, exiting"
+        exit 1
+    else
+        ### tag
+        data=$(echo "$parms" | jq --arg tag "$CIRCLE_TAG" '. |= .+ {"tag":$tag}')        
+    fi
+else
+    ### branch
+    data=$(echo "$parms" | jq --arg branch "$CIRCLE_BRANCH" '. |= .+ {"branch":$branch}')
+fi
+
+echo $data | jq .
 
 cirlce_ci_url="https://circleci.com/api/v2/project/gh/$CIRCLE_PROJECT_USERNAME/$CIRCLE_PROJECT_REPONAME/pipeline"
 
@@ -45,4 +83,3 @@ jq . $tmp_fil
 
 rm $header_result_file
 rm $tmp_fil
-
